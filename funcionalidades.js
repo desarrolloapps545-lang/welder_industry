@@ -15,6 +15,7 @@ const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const errorMsg = document.getElementById('error-msg');
 const logoutBtn = document.getElementById('logout-btn');
+const btnRefresh = document.getElementById('btn-refresh');
 
 // --- Elementos del Menú y Workspaces ---
 const workspaces = document.querySelectorAll('.workspace');
@@ -103,6 +104,7 @@ const btnSaveStockPermissions = document.getElementById('btn-save-stock-permissi
 // --- Variables Globales ---
 let currentUserRole = null;
 let targetUserIdToUpdate = null; // Para guardar el ID del usuario a editar/cambiar pass
+let currentWorkspaceId = null; // Para saber qué actualizar
 let usersCache = []; // Para guardar los datos de la tabla temporalmente
 let productsCache = []; // Cache para productos
 let inventoryCache = []; // Cache para inventario
@@ -140,6 +142,7 @@ function abrirWorkspace(idWorkspace) {
     // Ocultar todos primero
     workspaces.forEach(ws => ws.classList.add('hidden'));
     // Mostrar el deseado
+    currentWorkspaceId = idWorkspace;
     const ws = document.getElementById(idWorkspace);
     if (ws) {
         ws.classList.remove('hidden');
@@ -271,6 +274,41 @@ document.getElementById('btn-products').addEventListener('click', () => abrirWor
 document.getElementById('btn-inventory').addEventListener('click', () => abrirWorkspace('workspace-inventory'));
 document.getElementById('btn-registry').addEventListener('click', () => abrirWorkspace('workspace-registry'));
 document.getElementById('btn-history').addEventListener('click', () => abrirWorkspace('workspace-history'));
+
+// --- Lógica Botón Actualizar ---
+btnRefresh.addEventListener('click', async () => {
+    if (!currentWorkspaceId) return;
+
+    // Mostrar pantalla de carga
+    loadingScreen.classList.remove('hidden');
+
+    try {
+        // Simular un pequeño delay para que se note la carga si la respuesta es muy rápida
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        switch (currentWorkspaceId) {
+            case 'workspace-users':
+                await cargarUsuarios();
+                break;
+            case 'workspace-products':
+                await cargarProductos();
+                break;
+            case 'workspace-inventory':
+                await cargarInventario();
+                break;
+            case 'workspace-registry':
+                await cargarRegistrosHoy();
+                break;
+            case 'workspace-history':
+                await cargarHistorial();
+                break;
+        }
+    } catch (error) {
+        console.error("Error al actualizar:", error);
+    } finally {
+        loadingScreen.classList.add('hidden');
+    }
+});
 
 // --- Lógica Gestión de Usuarios ---
 

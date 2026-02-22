@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welders Industry</title>
+    <link rel="icon" href="img/logos/hover.png" type="image/png">
     <link rel="stylesheet" href="estilos.css">
     <!-- Importar Supabase desde CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,7 +24,7 @@
     <div class="container hidden" id="login-container">
         <!-- Pantalla de Inicio de Sesión -->
         <div id="login-screen">
-            <h1>Welders Industry</h1>
+            <img src="img/logos/login.png" alt="Welders Industry" class="app-logo">
             <h2>Iniciar Sesión</h2>
             <form id="login-form">
                 <input type="email" id="email" placeholder="Correo electrónico" required>
@@ -37,13 +38,14 @@
     <!-- Pantalla Principal (Dashboard) con Sidebar -->
     <div id="dashboard-screen" class="dashboard-layout hidden">
         <aside class="sidebar">
-            <h2>Welders Industry</h2>
+            <img src="img/logos/login.png" alt="Welders Industry" class="sidebar-logo">
             <nav class="sidebar-nav">
                 <button id="btn-users" class="nav-btn">Gestion de usuarios</button>
                 <button id="btn-products" class="nav-btn">Productos</button>
                 <button id="btn-inventory" class="nav-btn">Inventario</button>
                 <button id="btn-registry" class="nav-btn">Registro</button>
                 <button id="btn-history" class="nav-btn">Historial</button>
+                <button id="btn-refresh" class="nav-btn refresh-btn">Actualizar Datos</button>
                 <button id="logout-btn" class="nav-btn logout">Cerrar Sesión</button>
             </nav>
         </aside>

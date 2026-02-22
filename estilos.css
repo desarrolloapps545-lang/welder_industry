@@ -23,15 +23,20 @@ body {
     transform: translate(-50%, -50%);
 }
 
-h1 {
-    color: #333;
-    margin-bottom: 0.5rem;
+/* Logo en Login */
+.app-logo {
+    max-width: 250px;
+    margin-bottom: 0;
+    border: 2px solid black;
+    border-radius: 15px;
+    padding: 10px;
 }
 
 h2 {
     color: #666;
     font-size: 1.2rem;
     margin-bottom: 1.5rem;
+    margin-top: 10px;
 }
 
 input {
@@ -95,10 +100,15 @@ button:hover {
     display: flex;
 }
 
-.sidebar h2 {
-    color: white;
-    margin-bottom: 30px;
-    text-align: center;
+/* Logo en Sidebar */
+.sidebar-logo {
+    max-width: 95%;
+    margin: 0 auto 30px auto;
+    display: block;
+    border: 2px solid #dc3545;
+    border-radius: 15px;
+    padding: 5px;
+    background-color: white;
 }
 
 .sidebar-nav {
@@ -109,13 +119,20 @@ button:hover {
 
 .nav-btn {
     background-color: transparent;
-    text-align: left;
+    text-align: center;
     padding: 12px;
     margin: 0;
+    border: 2px solid #dc3545;
+    border-radius: 8px;
 }
 
 .nav-btn:hover {
     background-color: #495057;
+}
+
+.nav-btn.refresh-btn {
+    background-color: #17a2b8; /* Color distintivo para actualizar */
+    margin-top: 10px;
 }
 
 .nav-btn.logout {
@@ -355,7 +372,7 @@ th {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #f0f2f5;
+    background-color: rgba(240, 242, 245, 0.8); /* Semitransparente */
     display: flex;
     flex-direction: column;
     justify-content: center;
