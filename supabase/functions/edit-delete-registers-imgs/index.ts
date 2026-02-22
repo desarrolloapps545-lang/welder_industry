@@ -57,6 +57,41 @@ serve(async (req) => {
     if (action === 'delete') {
         const { plate_url, invoice_url } = payload;
         
+        // 0. Actualizar Inventario antes de borrar
+        // Recuperamos el registro para saber qué producto y cantidad ajustar
+        const { data: recordToDelete, error: fetchError } = await supabaseAdmin
+            .from(table)
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            throw new Error(`No se pudo recuperar el registro para ajustar el inventario: ${fetchError.message}`);
+        }
+
+        const product = recordToDelete.product;
+        let adjustment = 0;
+
+        if (table === 'product_entry') {
+            // Borrar entrada => Restar del inventario
+            adjustment = -Number(recordToDelete.amount_entry);
+        } else if (table === 'product_out') {
+            // Borrar salida => Sumar al inventario (devolver stock)
+            adjustment = Number(recordToDelete.amount_out);
+        }
+
+        if (adjustment !== 0) {
+            const { data: invItem } = await supabaseAdmin
+                .from('inventory')
+                .select('id, product_amount')
+                .eq('product', product)
+                .single();
+            
+            if (invItem) {
+                await supabaseAdmin.from('inventory').update({ product_amount: Number(invItem.product_amount) + adjustment }).eq('id', invItem.id);
+            }
+        }
+
         // 1. Eliminar imágenes del bucket
         const pathsToDelete: string[] = [];
         const platePath = getPathFromUrl(plate_url);
