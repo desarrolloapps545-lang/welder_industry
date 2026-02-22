@@ -1526,7 +1526,7 @@ async function exportarHistorial(tipo) {
     // --- EXPORTACIÓN A EXCEL (Nativo .xlsx) ---
     if (tipo === 'excel') {
         const workbook = new ExcelJS.Workbook();
-        workbook.calcProperties.fullCalcOnLoad = true;
+        workbook.calcProperties.fullCalcOnLoad = true; // Obliga a Excel a ejecutar las fórmulas (imágenes) tras habilitar contenido
         const worksheet = workbook.addWorksheet('Historial');
 
         // Estilos
@@ -1583,13 +1583,13 @@ async function exportarHistorial(tipo) {
 
             // Insertar Imágenes usando fórmula nativa de Excel
             if (rec.plate_url) {
-                row.getCell(6).value = { formula: `_xlfn.IMAGE("${rec.plate_url}")` };
+                row.getCell(6).value = { formula: `IF(NOW()>0, _xlfn.IMAGE("${rec.plate_url}"), "")` };
             } else {
                 row.getCell(6).value = '-';
             }
 
             if (rec.invoice_url) {
-                row.getCell(7).value = { formula: `_xlfn.IMAGE("${rec.invoice_url}")` };
+                row.getCell(7).value = { formula: `IF(NOW()>0, _xlfn.IMAGE("${rec.invoice_url}"), "")` };
             } else {
                 row.getCell(7).value = '-';
             }
@@ -1613,6 +1613,34 @@ async function exportarHistorial(tipo) {
     // --- EXPORTACIÓN A WORD (HTML) ---
     // Construimos el HTML para Word incluyendo la tabla de stock
     
+    // Estilos optimizados para Word: Hoja horizontal y tabla ajustada
+    const wordStyles = `
+        <style>
+            @page {
+                size: A4 landscape;
+                margin: 1cm;
+            }
+            body { font-family: Arial, sans-serif; font-size: 10pt; }
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                table-layout: fixed; /* Fuerza a la tabla a respetar el ancho de la hoja */
+            }
+            td, th { 
+                border: 1px solid #000; 
+                padding: 4px; 
+                vertical-align: middle; 
+                text-align: center; 
+                word-wrap: break-word; /* Ajuste de texto */
+            }
+            th { background-color: #e9ecef; font-weight: bold; }
+            img {
+                max-width: 100%;
+                height: auto;
+            }
+        </style>
+    `;
+    
     let stockTableHTML = '<table border="1" style="border-collapse: collapse; width: 100%; margin-bottom: 20px;"><thead><tr style="background-color: #6c757d; color: white;"><th>Producto</th><th>Cantidad</th><th>Unidad</th></tr></thead><tbody>';
     if (fullInventory) {
         fullInventory.forEach(item => {
@@ -1622,23 +1650,18 @@ async function exportarHistorial(tipo) {
     stockTableHTML += '</tbody></table>';
 
     let tableHTML = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
         <head>
             <meta charset="UTF-8">
-            <style>
-                body { font-family: Arial, sans-serif; }
-                table { border-collapse: collapse; width: 100%; }
-                td, th { border: 1px solid #ddd; padding: 8px; vertical-align: middle; text-align: center; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-            </style>
+            ${wordStyles}
         </head>
         <body>
-            <table>
-                <tr><td colspan="8" style="border:none; font-size: 16px; font-weight: bold; text-align: left;">Reporte de Historial - Welders Industry</td></tr>
-                <tr><td colspan="8" style="border:none; text-align: left;"><b>Fecha de descarga:</b> ${downloadDate}</td></tr>
-                <tr><td colspan="8" style="border:none; text-align: left;"><b>Descargado por:</b> ${downloaderName}</td></tr>
-                <tr><td colspan="8" style="border:none;">&nbsp;</td></tr>
-            </table>
+            <div style="width: 100%;">
+                <h2 style="text-align: left; margin-bottom: 5px;">Reporte de Historial - Welders Industry</h2>
+                <p style="margin: 0;"><b>Fecha de descarga:</b> ${downloadDate}</p>
+                <p style="margin: 0;"><b>Descargado por:</b> ${downloaderName}</p>
+                <br>
+            </div>
             
             <h3>Inventario Actual</h3>
             ${stockTableHTML}
@@ -1646,8 +1669,15 @@ async function exportarHistorial(tipo) {
             <h3>Detalle de Movimientos</h3>
             <table>
                 <thead>
-                    <tr style="background-color: #f0f0f0;">
-                        <th>Tipo</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Placa</th><th>Foto Placa</th><th>Foto Factura</th><th>Registrado por</th>
+                    <tr>
+                        <th style="width: 8%;">Tipo</th>
+                        <th style="width: 12%;">Fecha</th>
+                        <th style="width: 15%;">Producto</th>
+                        <th style="width: 10%;">Cantidad</th>
+                        <th style="width: 10%;">Placa</th>
+                        <th style="width: 15%;">Foto Placa</th>
+                        <th style="width: 15%;">Foto Factura</th>
+                        <th style="width: 15%;">Registrado por</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1657,9 +1687,9 @@ async function exportarHistorial(tipo) {
         const amountFmt = new Intl.NumberFormat('es-CO').format(rec.amount);
         const dateFmt = new Date(rec.created_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
         
-        // Para Word usamos etiquetas IMG normales
-        const plateCellContent = rec.plate_url ? `<img src="${rec.plate_url}" width="200" height="200">` : '-';
-        const invoiceCellContent = rec.invoice_url ? `<img src="${rec.invoice_url}" width="200" height="200">` : '-';
+        // Para Word usamos etiquetas IMG normales con tamaño reducido para no romper la tabla
+        const plateCellContent = rec.plate_url ? `<img src="${rec.plate_url}" width="90" height="90">` : '-';
+        const invoiceCellContent = rec.invoice_url ? `<img src="${rec.invoice_url}" width="90" height="90">` : '-';
 
         tableHTML += `<tr>
             <td>${rec.type}</td>
@@ -1667,8 +1697,8 @@ async function exportarHistorial(tipo) {
             <td>${rec.product}</td>
             <td>${amountFmt} ${rec.unit}</td>
             <td>${rec.plate}</td>
-            <td style="text-align:center; vertical-align:middle;">${plateCellContent}</td>
-            <td style="text-align:center; vertical-align:middle;">${invoiceCellContent}</td>
+            <td>${plateCellContent}</td>
+            <td>${invoiceCellContent}</td>
             <td>${rec.user_name || 'N/A'}</td>
         </tr>`;
     });
@@ -1775,4 +1805,43 @@ btnSaveStockPermissions.addEventListener('click', async () => {
     alert("Permisos actualizados correctamente.");
     btnSaveStockPermissions.textContent = "Guardar Permisos";
     modalStockPermissions.classList.add('hidden');
+});
+
+// --- Persistencia de Sesión (Recargar página sin perder login) ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // Verificar si existe una sesión activa en Supabase
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    
+    if (session) {
+        const userId = session.user.id;
+        
+        // Recuperar rol del usuario desde la base de datos
+        const { data: userData, error } = await supabaseClient
+            .from('users')
+            .select('role')
+            .eq('id', userId)
+            .single();
+        
+        if (userData) {
+            currentUserRole = userData.role;
+
+            // Configurar menú lateral según rol (Misma lógica que en login)
+            const menuUsers = document.getElementById('btn-users');
+            const menuProducts = document.getElementById('btn-products');
+            const menuInventory = document.getElementById('btn-inventory');
+
+            if (currentUserRole === 'Operario') {
+                menuUsers.classList.add('hidden');
+                menuProducts.classList.add('hidden');
+                menuInventory.classList.add('hidden');
+            } else {
+                menuUsers.classList.remove('hidden');
+                menuProducts.classList.remove('hidden');
+                menuInventory.classList.remove('hidden');
+            }
+
+            // Restaurar pantalla principal
+            cambiarPantalla(false);
+        }
+    }
 });
