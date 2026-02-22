@@ -1,0 +1,117 @@
+// e:\Welder_industry\supabase\functions\edit-delete-registers-imgs\index.ts
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error('No autorizado')
+
+    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) throw new Error('Error de configuración: SERVICE_ROLE_KEY no definida en secretos.');
+
+    // Cliente Admin para operaciones privilegiadas (Storage y DB)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      serviceRoleKey
+    )
+
+    const { action, id, table, ...payload } = await req.json()
+
+    console.log(`Procesando acción: ${action} para tabla: ${table}, ID: ${id}`);
+
+    if (!id || !table) throw new Error('Faltan parámetros id o table')
+
+    // Helper para obtener el bucket según la tabla
+    const getBucketFromTable = (tbl: string) => tbl === 'product_entry' ? 'entries' : 'exits';
+    const bucket = getBucketFromTable(table);
+
+    // Helper para extraer el path del archivo desde la URL pública
+    const getPathFromUrl = (url: string) => {
+        if (!url) return null;
+        try {
+            const urlObj = new URL(url);
+            // Estructura típica: .../storage/v1/object/public/bucket/folder/file
+            const pathParts = urlObj.pathname.split('/');
+            const publicIndex = pathParts.indexOf('public');
+            if (publicIndex === -1) return null;
+            // El path es todo lo que sigue al nombre del bucket
+            // pathParts[publicIndex + 1] es el bucket
+            return pathParts.slice(publicIndex + 2).join('/');
+        } catch (e) {
+            return null;
+        }
+    }
+
+    if (action === 'delete') {
+        const { plate_url, invoice_url } = payload;
+        
+        // 1. Eliminar imágenes del bucket
+        const pathsToDelete: string[] = [];
+        const platePath = getPathFromUrl(plate_url);
+        if (platePath) pathsToDelete.push(platePath);
+        
+        const invoicePath = getPathFromUrl(invoice_url);
+        if (invoicePath) pathsToDelete.push(invoicePath);
+
+        if (pathsToDelete.length > 0) {
+            console.log("Eliminando imágenes:", pathsToDelete);
+            const { error: storageError } = await supabaseAdmin.storage.from(bucket).remove(pathsToDelete);
+            if (storageError) console.error("Error borrando imágenes:", storageError);
+        }
+
+        // 2. Eliminar registro de la tabla
+        const { error: dbError } = await supabaseAdmin.from(table).delete().eq('id', id);
+        if (dbError) throw dbError;
+
+        return new Response(JSON.stringify({ message: 'Registro e imágenes eliminados correctamente' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    } 
+    
+    if (action === 'update') {
+        const { updates, old_plate_url, old_invoice_url } = payload;
+        
+        // 1. Verificar si las imágenes cambiaron para borrar las viejas
+        const pathsToDelete: string[] = [];
+        
+        // Si hay nueva URL y es diferente a la anterior, borramos la anterior
+        if (updates.plate_photo_url && old_plate_url && updates.plate_photo_url !== old_plate_url) {
+            const p = getPathFromUrl(old_plate_url);
+            if (p) pathsToDelete.push(p);
+        }
+        
+        if (updates.invoice_photo_url && old_invoice_url && updates.invoice_photo_url !== old_invoice_url) {
+            const p = getPathFromUrl(old_invoice_url);
+            if (p) pathsToDelete.push(p);
+        }
+
+        if (pathsToDelete.length > 0) {
+            console.log("Eliminando imágenes antiguas:", pathsToDelete);
+            const { error: storageError } = await supabaseAdmin.storage.from(bucket).remove(pathsToDelete);
+            if (storageError) console.error("Error borrando imágenes antiguas:", storageError);
+        }
+
+        // 2. Actualizar registro en la tabla
+        const { error: dbError } = await supabaseAdmin.from(table).update(updates).eq('id', id);
+        if (dbError) throw dbError;
+
+        return new Response(JSON.stringify({ message: 'Registro actualizado correctamente' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    throw new Error('Acción no válida')
+
+  } catch (error) {
+    console.error("Error en Edge Function:", error.message);
+    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+  }
+})

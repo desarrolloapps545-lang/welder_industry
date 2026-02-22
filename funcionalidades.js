@@ -101,6 +101,13 @@ const closeModalStock = document.getElementById('close-modal-stock');
 const stockPermissionsList = document.getElementById('stock-permissions-list');
 const btnSaveStockPermissions = document.getElementById('btn-save-stock-permissions');
 
+// --- Elementos Modal Editar Registro ---
+const modalEditRegistry = document.getElementById('modal-edit-registry');
+const closeModalEditRegistry = document.getElementById('close-modal-edit-registry');
+const formEditRegistry = document.getElementById('form-edit-registry');
+const modalEditRegistryMsg = document.getElementById('modal-edit-registry-msg');
+const editRegProductSelect = document.getElementById('edit-reg-product');
+
 // --- Variables Globales ---
 let currentUserRole = null;
 let targetUserIdToUpdate = null; // Para guardar el ID del usuario a editar/cambiar pass
@@ -1184,6 +1191,9 @@ async function cargarRegistrosHoy() {
         tableContainer.style.marginTop = '30px';
         
         const colRegistradoPor = '<th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Registrado por</th>';
+        // Columna de acciones solo para admins/devs
+        const isAdminOrDev = ['Desarrollador', 'Administrador maestro', 'Administrador'].includes(currentUserRole);
+        const colAcciones = isAdminOrDev ? '<th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Acciones</th>' : '';
 
         tableContainer.innerHTML = `
             <h3 style="margin-bottom: 15px; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 5px;">Registros de Hoy</h3>
@@ -1198,6 +1208,7 @@ async function cargarRegistrosHoy() {
                             <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Foto Placa</th>
                             <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Foto Factura</th>
                             ${colRegistradoPor}
+                            ${colAcciones}
                         </tr>
                     </thead>
                     <tbody id="registry-today-body"></tbody>
@@ -1207,7 +1218,8 @@ async function cargarRegistrosHoy() {
         workspace.appendChild(tableContainer);
     }
 
-    const colspan = 7;
+    const isAdminOrDev = ['Desarrollador', 'Administrador maestro', 'Administrador'].includes(currentUserRole);
+    const colspan = isAdminOrDev ? 8 : 7;
     const tbody = document.getElementById('registry-today-body');
     tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding: 20px;">Cargando registros...</td></tr>`;
 
@@ -1241,6 +1253,8 @@ async function cargarRegistrosHoy() {
         (resEntries.data || []).forEach(e => {
             allRecords.push({
                 type: 'Entrada',
+                id: e.id,
+                table: 'product_entry',
                 product: e.product,
                 amount: e.amount_entry,
                 unit: e.measurement_unit,
@@ -1256,6 +1270,8 @@ async function cargarRegistrosHoy() {
         (resExits.data || []).forEach(e => {
             allRecords.push({
                 type: 'Salida',
+                id: e.id,
+                table: 'product_out',
                 product: e.product,
                 amount: e.amount_out,
                 unit: e.measurement_unit,
@@ -1292,6 +1308,16 @@ async function cargarRegistrosHoy() {
                 : '<button disabled style="background:#e9ecef; color:#adb5bd; border:none; padding:5px 10px; border-radius:4px; cursor:not-allowed;">Ver</button>';
 
             const userCell = `<td style="padding:12px;">${rec.user_name || 'N/A'}</td>`;
+            
+            let accionesCell = '';
+            if (isAdminOrDev) {
+                // Pasamos el objeto rec completo serializado o usamos un ID para buscarlo en cache si fuera necesario.
+                // Aquí usaremos funciones globales pasando los datos clave.
+                accionesCell = `<td style="padding:12px;">
+                    <button onclick='prepararEdicionRegistro(${JSON.stringify(rec).replace(/'/g, "&#39;")})' style="background:#ffc107; border:none; padding:5px 8px; border-radius:4px; cursor:pointer; margin-right:5px;">✏️</button>
+                    <button onclick="eliminarRegistro('${rec.id}', '${rec.table}', '${rec.plate_url || ''}', '${rec.invoice_url || ''}')" style="background:#dc3545; border:none; padding:5px 8px; border-radius:4px; cursor:pointer; color:white;">🗑️</button>
+                </td>`;
+            }
 
             const row = document.createElement('tr');
             row.style.borderBottom = '1px solid #eee';
@@ -1303,6 +1329,7 @@ async function cargarRegistrosHoy() {
                 <td style="padding:12px;">${btnPlate}</td>
                 <td style="padding:12px;">${btnInvoice}</td>
                 ${userCell}
+                ${accionesCell}
             `;
             tbody.appendChild(row);
         });
@@ -1328,7 +1355,18 @@ closeModalImage.addEventListener('click', () => {
 // --- Lógica Historial ---
 
 async function cargarHistorial() {
-    const colspan = 8;
+    const isAdminOrDev = ['Desarrollador', 'Administrador maestro', 'Administrador'].includes(currentUserRole);
+    const colspan = isAdminOrDev ? 9 : 8;
+
+    // Agregar encabezado de acciones si no existe y es admin
+    const headerRow = document.querySelector('#history-table thead tr');
+    if (isAdminOrDev && headerRow && !headerRow.querySelector('.th-actions')) {
+        const th = document.createElement('th');
+        th.className = 'th-actions';
+        th.textContent = 'Acciones';
+        headerRow.appendChild(th);
+    }
+
     if (!historyTableBody) return;
     historyTableBody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding: 20px;">Cargando historial...</td></tr>`;
 
@@ -1349,7 +1387,7 @@ async function cargarHistorial() {
             if (selectedProduct) {
                 query = query.eq('product', selectedProduct);
             }
-            allPromises.push(query.then(res => ({...res, type: 'Entrada'})));
+            allPromises.push(query.then(res => ({...res, type: 'Entrada', table: 'product_entry'})));
         }
         if (filterType === 'salida' || filterType === 'todos') {
             let query = supabaseClient.from('product_out').select('*');
@@ -1361,7 +1399,7 @@ async function cargarHistorial() {
             if (selectedProduct) {
                 query = query.eq('product', selectedProduct);
             }
-            allPromises.push(query.then(res => ({...res, type: 'Salida'})));
+            allPromises.push(query.then(res => ({...res, type: 'Salida', table: 'product_out'})));
         }
 
         const resolvedPromises = await Promise.all(allPromises);
@@ -1372,6 +1410,8 @@ async function cargarHistorial() {
             (result.data || []).forEach(rec => {
                 allRecords.push({
                     type: result.type,
+                    id: rec.id,
+                    table: result.table,
                     product: rec.product,
                     amount: rec.amount_entry || rec.amount_out,
                     unit: rec.measurement_unit,
@@ -1406,6 +1446,14 @@ async function cargarHistorial() {
             const btnInvoice = rec.invoice_url ? `<button onclick="abrirModalImagen('${rec.invoice_url}')" style="display:inline-block; background:#17a2b8; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;">Ver</button>` : '<button disabled style="background:#e9ecef; color:#adb5bd; border:none; padding:5px 10px; border-radius:4px; cursor:not-allowed;">Ver</button>';
 
             const userCell = `<td style="padding:12px;">${rec.user_name || 'N/A'}</td>`;
+            
+            let accionesCell = '';
+            if (isAdminOrDev) {
+                accionesCell = `<td style="padding:12px;">
+                    <button onclick='prepararEdicionRegistro(${JSON.stringify(rec).replace(/'/g, "&#39;")})' style="background:#ffc107; border:none; padding:5px 8px; border-radius:4px; cursor:pointer; margin-right:5px;">✏️</button>
+                    <button onclick="eliminarRegistro('${rec.id}', '${rec.table}', '${rec.plate_url || ''}', '${rec.invoice_url || ''}')" style="background:#dc3545; border:none; padding:5px 8px; border-radius:4px; cursor:pointer; color:white;">🗑️</button>
+                </td>`;
+            }
 
             const row = document.createElement('tr');
             row.style.borderBottom = '1px solid #eee';
@@ -1418,6 +1466,7 @@ async function cargarHistorial() {
                 <td style="padding:12px;">${btnPlate}</td>
                 <td style="padding:12px;">${btnInvoice}</td>
                 ${userCell}
+                ${accionesCell}
             `;
             historyTableBody.appendChild(row);
         });
@@ -1896,5 +1945,164 @@ document.addEventListener('DOMContentLoaded', async () => {
     } finally {
         // Ocultar pantalla de carga
         loadingScreen.classList.add('hidden');
+    }
+});
+
+// --- Lógica Editar y Eliminar Registros (Admin/Dev) ---
+
+window.eliminarRegistro = async (id, table, plateUrl, invoiceUrl) => {
+    if (!confirm("¿Estás seguro de eliminar este registro y sus imágenes? Esta acción es irreversible.")) return;
+
+    loadingScreen.classList.remove('hidden');
+
+    // Obtener sesión actual para asegurar el token
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    const { data, error } = await supabaseClient.functions.invoke('edit-delete-registers-imgs', {
+        body: {
+            action: 'delete',
+            id: id,
+            table: table,
+            plate_url: plateUrl,
+            invoice_url: invoiceUrl
+        },
+        headers: {
+            Authorization: `Bearer ${session?.access_token}`
+        }
+    });
+
+    loadingScreen.classList.add('hidden');
+
+    if (error) {
+        console.error("Error invoke:", error);
+        let errorMessage = error.message;
+        // Intentar extraer el mensaje real del cuerpo de la respuesta
+        if (error && error.context && typeof error.context.json === 'function') {
+            try {
+                const body = await error.context.json();
+                errorMessage = body.error || body.message || errorMessage;
+            } catch (e) { console.error("No se pudo parsear error body", e); }
+        }
+        alert("Error al eliminar: " + errorMessage);
+    } else {
+        alert("Registro eliminado correctamente.");
+        // Recargar la vista actual
+        if (currentWorkspaceId === 'workspace-registry') cargarRegistrosHoy();
+        if (currentWorkspaceId === 'workspace-history') cargarHistorial();
+        // Actualizar inventario por si acaso
+        cargarInventario();
+    }
+};
+
+window.prepararEdicionRegistro = async (rec) => {
+    // Cargar productos en el select del modal
+    if (inventoryCache.length === 0) await cargarInventario();
+    const uniqueProducts = [...new Set(inventoryCache.map(item => item.product))];
+    
+    editRegProductSelect.innerHTML = '<option value="" disabled selected hidden>Seleccione producto</option>';
+    uniqueProducts.forEach(prodName => {
+        const item = inventoryCache.find(i => i.product === prodName);
+        const option = document.createElement('option');
+        option.value = prodName;
+        option.dataset.unit = item.measurement_unit;
+        option.textContent = prodName;
+        editRegProductSelect.appendChild(option);
+    });
+
+    // Llenar datos
+    document.getElementById('edit-reg-id').value = rec.id;
+    document.getElementById('edit-reg-table').value = rec.table;
+    document.getElementById('edit-reg-old-plate').value = rec.plate_url || '';
+    document.getElementById('edit-reg-old-invoice').value = rec.invoice_url || '';
+    
+    editRegProductSelect.value = rec.product;
+    document.getElementById('edit-reg-amount').value = new Intl.NumberFormat('es-CO').format(rec.amount);
+    document.getElementById('edit-reg-unit-display').textContent = rec.unit;
+    document.getElementById('edit-reg-plate').value = rec.plate;
+
+    modalEditRegistryMsg.textContent = '';
+    modalEditRegistry.classList.remove('hidden');
+};
+
+closeModalEditRegistry.addEventListener('click', () => {
+    modalEditRegistry.classList.add('hidden');
+});
+
+// Formatear input de cantidad en modal editar
+document.getElementById('edit-reg-amount').addEventListener('input', (e) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val) val = new Intl.NumberFormat('es-CO').format(parseInt(val, 10));
+    e.target.value = val;
+});
+
+formEditRegistry.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    modalEditRegistryMsg.textContent = "Guardando cambios...";
+
+    const id = document.getElementById('edit-reg-id').value;
+    const table = document.getElementById('edit-reg-table').value;
+    const oldPlateUrl = document.getElementById('edit-reg-old-plate').value;
+    const oldInvoiceUrl = document.getElementById('edit-reg-old-invoice').value;
+    
+    const product = editRegProductSelect.value;
+    const amount = parseFloat(document.getElementById('edit-reg-amount').value.replace(/\./g, ''));
+    const unit = document.getElementById('edit-reg-unit-display').textContent;
+    const plate = document.getElementById('edit-reg-plate').value.toUpperCase();
+    
+    const filePlate = document.getElementById('edit-reg-photo-plate').files[0];
+    const fileInvoice = document.getElementById('edit-reg-photo-invoice').files[0];
+
+    const updates = {
+        product: product,
+        [table === 'product_entry' ? 'amount_entry' : 'amount_out']: amount,
+        measurement_unit: unit,
+        car_registration: plate
+    };
+
+    try {
+        const bucket = table === 'product_entry' ? 'entries' : 'exits';
+        const timestamp = Date.now();
+
+        if (filePlate) {
+            const path = `placas/${timestamp}_EDIT_${plate}.jpg`;
+            const { error: upErr } = await supabaseClient.storage.from(bucket).upload(path, filePlate);
+            if (upErr) throw upErr;
+            updates.plate_photo_url = supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        }
+
+        if (fileInvoice) {
+            const path = `facturas/${timestamp}_EDIT_${plate}.jpg`;
+            const { error: upErr } = await supabaseClient.storage.from(bucket).upload(path, fileInvoice);
+            if (upErr) throw upErr;
+            updates.invoice_photo_url = supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        }
+
+        const { data: { session } } = await supabaseClient.auth.getSession();
+
+        const { error } = await supabaseClient.functions.invoke('edit-delete-registers-imgs', {
+            body: { action: 'update', id, table, updates, old_plate_url: oldPlateUrl, old_invoice_url: oldInvoiceUrl },
+            headers: {
+                Authorization: `Bearer ${session?.access_token}`
+            }
+        });
+
+        if (error) throw error;
+
+        alert("Registro actualizado.");
+        modalEditRegistry.classList.add('hidden');
+        if (currentWorkspaceId === 'workspace-registry') cargarRegistrosHoy();
+        if (currentWorkspaceId === 'workspace-history') cargarHistorial();
+        cargarInventario();
+
+    } catch (error) {
+        console.error(error);
+        let errorMessage = error.message;
+        if (error && error.context && typeof error.context.json === 'function') {
+            try {
+                const body = await error.context.json();
+                errorMessage = body.error || body.message || errorMessage;
+            } catch (e) { /* ignore */ }
+        }
+        modalEditRegistryMsg.textContent = "Error: " + errorMessage;
     }
 });

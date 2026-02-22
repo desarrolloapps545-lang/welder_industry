@@ -320,6 +320,41 @@
         </div>
     </div>
 
+    <!-- Modal Editar Registro (Admin/Dev) -->
+    <div id="modal-edit-registry" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal" id="close-modal-edit-registry">&times;</span>
+            <h2>Editar Registro</h2>
+            <form id="form-edit-registry">
+                <input type="hidden" id="edit-reg-id">
+                <input type="hidden" id="edit-reg-table">
+                <input type="hidden" id="edit-reg-old-plate">
+                <input type="hidden" id="edit-reg-old-invoice">
+                
+                <label>Producto:</label>
+                <select id="edit-reg-product" required></select>
+
+                <label>Cantidad:</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="text" id="edit-reg-amount" required>
+                    <span id="edit-reg-unit-display" style="font-weight: bold;"></span>
+                </div>
+
+                <label>Placa:</label>
+                <input type="text" id="edit-reg-plate" required>
+
+                <label>Nueva Foto Placa (Opcional):</label>
+                <input type="file" id="edit-reg-photo-plate" accept="image/*">
+
+                <label>Nueva Foto Factura (Opcional):</label>
+                <input type="file" id="edit-reg-photo-invoice" accept="image/*">
+
+                <button type="submit" style="margin-top: 15px;">Guardar Cambios</button>
+            </form>
+            <p id="modal-edit-registry-msg" class="error"></p>
+        </div>
+    </div>
+
     <!-- Modal para ver imágenes -->
     <div id="modal-image-viewer" class="modal hidden">
         <div class="modal-content" style="padding: 10px; background: #fff; max-width: 90vw; max-height: 90vh;">
